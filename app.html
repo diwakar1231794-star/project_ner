@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RouteAI – Offline-First Logistics Navigation</title>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="network-banner" class="network-banner online">🟢 Online · Live sync enabled</div>
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🗺️</span>
+        <span class="logo-text">RouteAI</span>
+      </div>
+      <div class="user-bar">
+        <span id="user-badge" class="user-badge">—</span>
+        <span id="gps-status" class="status-pill offline">GPS: Off</span>
+        <button id="logout-btn" class="logout-btn">Logout</button>
+      </div>
+    </header>
+    <div class="quick-status-bar"><span id="sync-mini-status">Ready</span><span id="offline-hint">Your reports work offline</span></div>
+
+    <section class="home-route-card" aria-label="Route search">
+      <div class="home-route-title"><div><strong>Plan your goods journey</strong><span>Search From and To, or use your current location.</span></div><span class="route-step">1. Route</span></div>
+      <div class="main-search-row">
+        <span class="main-search-dot from-dot"></span>
+        <input type="text" id="source-input" placeholder="From: Search starting point" autocomplete="off" />
+        <button id="source-clear" class="main-clear" title="Clear From">✕</button>
+      </div>
+      <div id="source-suggestions" class="suggestions main-suggestions hidden"></div>
+      <div class="main-search-row">
+        <span class="main-search-dot to-dot"></span>
+        <input type="text" id="destination-input" placeholder="To: Search destination" autocomplete="off" />
+        <button id="dest-clear" class="main-clear" title="Clear To">✕</button>
+      </div>
+      <div id="dest-suggestions" class="suggestions main-suggestions hidden"></div>
+      <div class="main-route-actions">
+        <button id="use-my-location" class="my-location-btn">📍 Use my location</button>
+        <button id="calc-route-btn" class="find-route-btn">🧭 Find routes</button>
+      </div>
+      <div class="main-route-tip">Type a place and select a suggestion. Live routes need internet.</div>
+    </section>
+
+    <div id="route-planner-panel" class="hidden" aria-hidden="true"></div>
+
+    <div id="map"></div>
+
+    <!-- All Routes Panel -->
+    <div id="routes-panel" class="routes-panel hidden">
+      <div class="routes-header">
+        <h3>Available Routes</h3>
+        <button id="close-routes" class="icon-btn" title="Close">✕</button>
+      </div>
+      <div id="routes-list" class="routes-list"></div>
+      <p class="routes-hint">Tap a route to highlight it on the map. Green = clear · Amber = partial · Red = blocked</p>
+    </div>
+
+    <!-- AI Analysis Panel -->
+    <div id="analysis-panel" class="analysis-panel hidden">
+      <div class="analysis-header">
+        <h3>AI Route Analysis</h3>
+        <button id="close-analysis" class="icon-btn" title="Close">✕</button>
+      </div>
+      <div class="analysis-grid">
+        <div class="a-card">
+          <span class="a-label">Road Availability</span>
+          <span id="a-road" class="a-value">—</span>
+        </div>
+        <div class="a-card">
+          <span class="a-label">Weather</span>
+          <span id="a-weather" class="a-value">—</span>
+        </div>
+        <div class="a-card">
+          <span class="a-label">Temperature</span>
+          <span id="a-temp" class="a-value">—</span>
+        </div>
+        <div class="a-card">
+          <span class="a-label">Blockages Found</span>
+          <span id="a-block" class="a-value">—</span>
+        </div>
+      </div>
+      <div id="a-recommendation" class="a-recommend"></div>
+      <div id="a-block-list" class="a-block-list hidden"></div>
+    </div>
+
+    <div class="bottom-panel">
+      <div class="route-mini-status">
+        <div><span class="mini-label">FROM</span><b id="source-loc">Not set</b></div>
+        <div class="arrow">→</div>
+        <div><span class="mini-label">TO</span><b id="dest-loc">Not set</b></div>
+      </div>
+      <div id="route-status" class="route-status hidden"></div>
+      <div id="route-info" class="route-info hidden"></div>
+      <nav class="bottom-nav" aria-label="Main actions">
+        <button id="quick-report-btn" class="nav-btn danger-nav"><span>🚨</span><b>Report</b></button>
+        <button id="upload-photo-btn" class="nav-btn"><span>📷</span><b>Photo</b></button>
+        <button id="show-routes-btn" class="nav-btn"><span>🛣️</span><b>Routes</b></button>
+        <button id="show-analysis-btn" class="nav-btn"><span>📊</span><b>Analysis</b></button>
+        <button id="offline-data-btn" class="nav-btn"><span>📦</span><b>Saved</b></button>
+        <button id="center-me-btn" class="nav-btn"><span>📍</span><b>GPS</b></button>
+        <button id="toggle-track-btn" class="nav-btn" style="display:none" aria-hidden="true">Live GPS</button>
+      </nav>
+    </div>
+
+    <!-- Photo Modal -->
+    <div id="upload-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Upload Geo-tagged Photo</h3>
+        <p class="hint" id="upload-hint">Your report is linked to your account. You can remove only your own reports.</p>
+        <label class="file-label">
+          <input type="file" id="photo-input" accept="image/*" capture="environment" />
+          Choose / Take Photo
+        </label>
+        <div id="preview-container" class="preview hidden">
+          <img id="photo-preview" alt="Preview" />
+        </div>
+        <label>Description (e.g. landslide, flood, accident)
+          <input type="text" id="photo-desc" placeholder="What is happening?" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="use-current-gps" checked />
+          Use my current GPS location
+        </label>
+        <div class="modal-actions">
+          <button id="cancel-upload" class="secondary-btn">Cancel</button>
+          <button id="confirm-upload" class="primary-btn">Upload &amp; Tag</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="saved-data-panel" class="analysis-panel hidden">
+      <div class="analysis-header">
+        <h3>Saved data & sync</h3>
+        <button id="close-saved-data" class="icon-btn" title="Close">✕</button>
+      </div>
+      <div class="offline-stats">
+        <div class="a-card"><span class="a-label">Pending reports</span><span id="pending-count" class="a-value">0</span></div>
+        <div class="a-card"><span class="a-label">Cached routes</span><span id="cached-count" class="a-value">0</span></div>
+        <div class="a-card"><span class="a-label">Connection</span><span id="connection-value" class="a-value">—</span></div>
+      </div>
+      <div class="my-upload-tools">
+        <label class="search-label-block">🔎 Search your uploads
+          <input id="my-upload-search" type="search" placeholder="Search photo, incident or note..." autocomplete="off" />
+        </label>
+        <div class="upload-filter-row">
+          <button id="show-my-uploads" class="filter-btn active">My uploads</button>
+          <button id="show-all-uploads" class="filter-btn">All uploads</button>
+        </div>
+      </div>
+      <div id="saved-data-list" class="a-block-list"></div>
+      <button id="delete-selected-uploads" class="secondary-btn" style="width:100%;margin-top:10px">🗑️ Delete selected my uploads</button>
+      <button id="sync-now-btn" class="primary-btn" style="width:100%;margin-top:10px">↻ Sync now</button>
+    </div>
+
+    <!-- Quick Incident Modal -->
+    <div id="quick-report-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>🚨 Quick Incident Report</h3>
+        <p class="hint">Designed for weak/no-signal areas. Save now; RouteAI syncs automatically when signal returns.</p>
+        <label>Incident type
+          <select id="incident-type">
+            <option>Flood / Waterlogging</option><option>Landslide</option><option>Road Damage</option>
+            <option>Accident</option><option>Traffic / Crowd</option><option>Bridge / Road Blocked</option><option>Other</option>
+          </select>
+        </label>
+        <label>Severity
+          <select id="incident-severity">
+            <option>High</option><option>Medium</option><option>Low</option>
+          </select>
+        </label>
+        <label>Short note
+          <input type="text" id="incident-note" placeholder="Optional: what happened?" />
+        </label>
+        <label class="file-label compact-file"><input type="file" id="incident-photo" accept="image/*" capture="environment" /> 📷 Add photo (optional)</label>
+        <div id="incident-photo-name" class="file-name">No photo selected</div>
+        <label class="checkbox-label"><input type="checkbox" id="incident-gps" checked /> Use current GPS</label>
+        <div class="modal-actions">
+          <button id="cancel-quick-report" class="secondary-btn">Cancel</button>
+          <button id="save-quick-report" class="primary-btn">Save Report</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/app.js"></script>
+  <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: route-ai-app
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start

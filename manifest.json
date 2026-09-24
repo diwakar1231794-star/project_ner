@@ -1,0 +1,9 @@
+{
+  "name": "RouteAI \u2013 Offline-First Logistics",
+  "short_name": "RouteAI",
+  "start_url": "app.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": []
+}
